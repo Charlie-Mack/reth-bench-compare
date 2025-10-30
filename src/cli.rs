@@ -489,17 +489,21 @@ async fn run_benchmark_workflow(
     let (baseline_commit, feature_commit) =
         run_compilation_phase(git_manager, compilation_manager, args, is_optimism).await?;
 
-    // Run warmup phase before benchmarking
-    run_warmup_phase(
-        git_manager,
-        compilation_manager,
-        node_manager,
-        benchmark_runner,
-        args,
-        is_optimism,
-        &baseline_commit,
-    )
-    .await?;
+    // Run warmup phase before benchmarking (skip if warmup_blocks is 0)
+    if args.get_warmup_blocks() > 0 {
+        run_warmup_phase(
+            git_manager,
+            compilation_manager,
+            node_manager,
+            benchmark_runner,
+            args,
+            is_optimism,
+            &baseline_commit,
+        )
+        .await?;
+    } else {
+        info!("Skipping warmup phase (warmup_blocks is 0)");
+    }
 
     let refs = [&args.baseline_ref, &args.feature_ref];
     let ref_types = ["baseline", "feature"];

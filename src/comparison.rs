@@ -152,7 +152,12 @@ impl ComparisonGenerator {
     }
 
     /// Set the benchmark run timestamps for a reference
-    pub fn set_ref_timestamps(&mut self, ref_type: &str, start: DateTime<Utc>, end: DateTime<Utc>) -> Result<()> {
+    pub fn set_ref_timestamps(
+        &mut self,
+        ref_type: &str,
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+    ) -> Result<()> {
         match ref_type {
             "baseline" => {
                 if let Some(ref mut results) = self.baseline_results {
@@ -161,7 +166,7 @@ impl ComparisonGenerator {
                 } else {
                     return Err(eyre!("Baseline results not loaded yet"));
                 }
-            },
+            }
             "feature" => {
                 if let Some(ref mut results) = self.feature_results {
                     results.start_timestamp = Some(start);
@@ -169,7 +174,7 @@ impl ComparisonGenerator {
                 } else {
                     return Err(eyre!("Feature results not loaded yet"));
                 }
-            },
+            }
             _ => return Err(eyre!("Unknown reference type: {}", ref_type)),
         }
 
@@ -477,8 +482,15 @@ impl ComparisonGenerator {
             "  Avg NewPayload: {:.2}ms",
             baseline.avg_new_payload_latency_ms
         );
-        if let (Some(start), Some(end)) = (&report.baseline.start_timestamp, &report.baseline.end_timestamp) {
-            println!("  Started: {}, Ended: {}", start.format("%Y-%m-%d %H:%M:%S UTC"), end.format("%Y-%m-%d %H:%M:%S UTC"));
+        if let (Some(start), Some(end)) = (
+            &report.baseline.start_timestamp,
+            &report.baseline.end_timestamp,
+        ) {
+            println!(
+                "  Started: {}, Ended: {}",
+                start.format("%Y-%m-%d %H:%M:%S UTC"),
+                end.format("%Y-%m-%d %H:%M:%S UTC")
+            );
         }
         println!();
 
@@ -494,8 +506,15 @@ impl ComparisonGenerator {
             "  Avg NewPayload: {:.2}ms",
             feature.avg_new_payload_latency_ms
         );
-        if let (Some(start), Some(end)) = (&report.feature.start_timestamp, &report.feature.end_timestamp) {
-            println!("  Started: {}, Ended: {}", start.format("%Y-%m-%d %H:%M:%S UTC"), end.format("%Y-%m-%d %H:%M:%S UTC"));
+        if let (Some(start), Some(end)) = (
+            &report.feature.start_timestamp,
+            &report.feature.end_timestamp,
+        ) {
+            println!(
+                "  Started: {}, Ended: {}",
+                start.format("%Y-%m-%d %H:%M:%S UTC"),
+                end.format("%Y-%m-%d %H:%M:%S UTC")
+            );
         }
         println!();
     }
