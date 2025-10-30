@@ -295,15 +295,7 @@ impl NodeManager {
                     Ok(sync_result) => {
                         match sync_result {
                             SyncStatus::Info(sync_info)
-                                if sync_info.current_block != sync_info.highest_block
-                                    || sync_info.stages.as_ref().is_some_and(|stages| {
-                                        let Some(finish) =
-                                            stages.iter().find(|stage| stage.name == "Finish")
-                                        else {
-                                            return true;
-                                        };
-                                        stages.iter().any(|stage| stage.block < finish.block)
-                                    }) =>
+                                if sync_info.current_block != sync_info.highest_block =>
                             {
                                 debug!("Node is still syncing {sync_info:?}, waiting...");
                             }
