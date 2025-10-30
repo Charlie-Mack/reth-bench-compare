@@ -9,7 +9,6 @@ use nix::sys::signal::{killpg, Signal};
 #[cfg(unix)]
 use nix::unistd::Pid;
 use reth_chainspec::Chain;
-use std::collections::HashSet;
 use std::{fs, path::PathBuf, time::Duration};
 use tokio::{
     io::{AsyncBufReadExt, BufReader as AsyncBufReader},
@@ -296,15 +295,7 @@ impl NodeManager {
                     Ok(sync_result) => {
                         match sync_result {
                             SyncStatus::Info(sync_info)
-                                if sync_info.current_block != sync_info.highest_block
-                                    || sync_info.stages.as_ref().is_some_and(|stages| {
-                                        stages
-                                            .iter()
-                                            .map(|stage| stage.block)
-                                            .collect::<HashSet<_>>()
-                                            .len()
-                                            > 1
-                                    }) =>
+                                if sync_info.current_block != sync_info.highest_block =>
                             {
                                 debug!("Node is still syncing {sync_info:?}, waiting...");
                             }
