@@ -13,22 +13,29 @@ pub struct CompilationManager {
     repo_root: String,
     output_dir: PathBuf,
     git_manager: GitManager,
+    features: String,
 }
 
 impl CompilationManager {
     /// Create a new CompilationManager
-    pub fn new(repo_root: String, output_dir: PathBuf, git_manager: GitManager) -> Result<Self> {
+    pub fn new(
+        repo_root: String,
+        output_dir: PathBuf,
+        git_manager: GitManager,
+        features: String,
+    ) -> Result<Self> {
         Ok(Self {
             repo_root,
             output_dir,
             git_manager,
+            features,
         })
     }
 
     /// Detect if the RPC endpoint is an Optimism chain
     pub async fn detect_optimism_chain(&self, rpc_url: &str) -> Result<bool> {
         info!("Detecting chain type from RPC endpoint...");
-        
+
         // Create Alloy provider
         let url = rpc_url
             .parse()
@@ -53,18 +60,17 @@ impl CompilationManager {
     /// Get the path to the cached binary using explicit commit hash
     pub fn get_cached_binary_path_for_commit(&self, commit: &str, is_optimism: bool) -> PathBuf {
         let identifier = &commit[..8]; // Use first 8 chars of commit
-        
+
         let binary_name = if is_optimism {
             format!("op-reth_{}", identifier)
         } else {
             format!("reth_{}", identifier)
         };
-        
+
         self.output_dir.join("bin").join(binary_name)
     }
 
-
-    /// Compile reth using `make profiling` and cache the binary
+    /// Compile reth using cargo build and cache the binary
     pub fn compile_reth(&self, commit: &str, is_optimism: bool) -> Result<()> {
         // Validate that current git commit matches the expected commit
         let current_commit = self.git_manager.get_current_commit()?;
@@ -80,35 +86,49 @@ impl CompilationManager {
 
         // Check if cached binary already exists (since path contains commit hash, it's valid)
         if cached_path.exists() {
-            info!(
-                "Using cached binary (commit: {})",
-                &commit[..8]
-            );
+            info!("Using cached binary (commit: {})", &commit[..8]);
             return Ok(());
         }
 
-        info!("No cached binary found, compiling (commit: {})...", &commit[..8]);
+        info!(
+            "No cached binary found, compiling (commit: {})...",
+            &commit[..8]
+        );
 
-        let (make_target, binary_name) = if is_optimism {
-            ("profiling-op", "op-reth")
-        } else {
-            ("profiling", "reth")
-        };
+        let binary_name = if is_optimism { "op-reth" } else { "reth" };
 
         info!(
             "Compiling {} with profiling configuration (commit: {})...",
-            binary_name, &commit[..8]
+            binary_name,
+            &commit[..8]
         );
 
-        let mut cmd = Command::new("make");
-        cmd.arg(make_target).current_dir(&self.repo_root);
+        let mut cmd = Command::new("cargo");
+        cmd.arg("build").arg("--profile").arg("profiling");
+
+        // Add features
+        cmd.arg("--features").arg(&self.features);
+        info!("Using features: {}", self.features);
+
+        // Add bin-specific arguments for optimism
+        if is_optimism {
+            cmd.arg("--bin")
+                .arg("op-reth")
+                .arg("--manifest-path")
+                .arg("crates/optimism/bin/Cargo.toml");
+        }
+
+        cmd.current_dir(&self.repo_root);
+
+        // Set RUSTFLAGS for native CPU optimization
+        cmd.env("RUSTFLAGS", "-C target-cpu=native");
 
         // Debug log the command
-        debug!("Executing make command: {:?}", cmd);
+        debug!("Executing cargo command: {:?}", cmd);
 
         let output = cmd
             .output()
-            .wrap_err("Failed to execute make profiling command")?;
+            .wrap_err("Failed to execute cargo build command")?;
 
         // Print stdout and stderr with prefixes at debug level
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -116,32 +136,32 @@ impl CompilationManager {
 
         for line in stdout.lines() {
             if !line.trim().is_empty() {
-                debug!("[MAKE] {}", line);
+                debug!("[CARGO] {}", line);
             }
         }
 
         for line in stderr.lines() {
             if !line.trim().is_empty() {
-                debug!("[MAKE] {}", line);
+                debug!("[CARGO] {}", line);
             }
         }
 
         if !output.status.success() {
             // Print all output when compilation fails
             error!(
-                "Make profiling failed with exit code: {:?}",
+                "Cargo build failed with exit code: {:?}",
                 output.status.code()
             );
 
             if !stdout.trim().is_empty() {
-                error!("Make stdout:");
+                error!("Cargo stdout:");
                 for line in stdout.lines() {
                     error!("  {}", line);
                 }
             }
 
             if !stderr.trim().is_empty() {
-                error!("Make stderr:");
+                error!("Cargo stderr:");
                 for line in stderr.lines() {
                     error!("  {}", line);
                 }
@@ -156,7 +176,8 @@ impl CompilationManager {
         info!("{} compilation completed", binary_name);
 
         // Copy the compiled binary to cache
-        let source_path = PathBuf::from(&self.repo_root).join(format!("target/profiling/{}", binary_name));
+        let source_path =
+            PathBuf::from(&self.repo_root).join(format!("target/profiling/{}", binary_name));
         if !source_path.exists() {
             return Err(eyre!("Compiled binary not found at {:?}", source_path));
         }
