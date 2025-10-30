@@ -294,7 +294,9 @@ impl NodeManager {
                 match provider.syncing().await {
                     Ok(sync_result) => {
                         match sync_result {
-                            SyncStatus::Info(sync_info) => {
+                            SyncStatus::Info(sync_info)
+                                if sync_info.current_block != sync_info.highest_block =>
+                            {
                                 debug!("Node is still syncing {sync_info:?}, waiting...");
                             }
                             _ => {
